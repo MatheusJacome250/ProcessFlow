@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
+#include <unistd.h>
+#include <sys/wait.h>
 
 #define MAX_CHAR 1000
 #define MAX_ARGS 50
@@ -51,6 +53,32 @@ void cadastrar_tarefa(char *lista_comando[], int contador_comando) {
         fim->prox = nova_tarefa;
         fim = nova_tarefa;
     }
+}
+
+Tarefa *buscar_tarefa(char *nome) {
+    
+    Tarefa *atual = inicio;
+    while (atual != NULL) {
+        if (strcmp(atual->nome, nome) == 0) {
+            return atual;
+        }
+        atual = atual->prox;
+    }
+
+    return NULL;
+}
+
+void executar_tarefa(Tarefa *tarefa) {
+
+    char *argumentos[MAX_ARGS + 2];
+
+    argumentos[0] = tarefa->programa;
+
+    for (int i = 0; i < tarefa->qtd_argumentos; i++) {
+        argumentos[i + 1] = tarefa->argumentos[i];
+    }
+
+    argumentos[tarefa->qtd_argumentos + 1] = NULL;
 }
 
 int main() {
