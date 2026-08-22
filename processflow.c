@@ -1,21 +1,57 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
 
 #define MAX_CHAR 1000
 #define MAX_ARGS 50
-#define MAX_TAREFAS 100
 #define MAX_TEXTO 256
 
-typedef struct {
+typedef struct Tarefa {
     char nome[MAX_TEXTO];
     char programa[MAX_TEXTO];
     char argumentos[MAX_ARGS][MAX_TEXTO];
     int qtd_argumentos;
+    struct Tarefa *prox;
 } Tarefa;
 
-Tarefa tarefas[MAX_TAREFAS];
-int qtd_tarefas = 0;
+Tarefa *inicio = NULL;
+Tarefa *fim = NULL;
+
+void cadastrar_tarefa(char *lista_comando[], int contador_comando) {
+
+    if (contador_comando < 3) {
+        printf("Erro!!! \n formato correto: task <nome> <programa> [argumentos...]\n");
+        return;
+    }
+
+    Tarefa *nova_tarefa = (Tarefa *) malloc(sizeof(Tarefa));
+
+    if (nova_tarefa == NULL) {
+        printf("Erro!!! Falha ao alocar memoria.\n");
+        return;
+    }
+
+    strcpy(nova_tarefa->nome, lista_comando[1]);
+    strcpy(nova_tarefa->programa, lista_comando[2]);
+
+    nova_tarefa->qtd_argumentos = contador_comando - 3;
+
+    for (int i = 3; i < contador_comando; i++) {
+        strcpy(nova_tarefa->argumentos[i - 3], lista_comando[i]);
+    }
+
+    nova_tarefa->prox = NULL;
+
+    if (inicio == NULL) {
+        inicio = nova_tarefa;
+        fim = nova_tarefa;
+    }
+    else {
+        fim->prox = nova_tarefa;
+        fim = nova_tarefa;
+    }
+}
 
 int main() {
 
@@ -48,6 +84,10 @@ int main() {
 
         if (strcmp(lista_comando[0], "exit") == 0) {
             break;
+        }
+
+        else if (strcmp(lista_comando[0], "task") == 0) {
+            cadastrar_tarefa(lista_comando, contador_comando);
         }
     }
 
