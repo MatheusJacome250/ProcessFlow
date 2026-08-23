@@ -201,6 +201,16 @@ int main() {
                 executar_sequencial(lista_comando, contador_comando);
             }
 
+            else if (strcmp(lista_comando[1], "parallel") == 0) {
+
+                if (contador_comando < 3) {
+                    printf("Erro!!! Informe pelo menos uma tarefa.\n");
+                    continue;
+                }
+
+                executar_paralelo(lista_comando, contador_comando);
+            }
+
             else {
 
                 Tarefa *tarefa = buscar_tarefa(lista_comando[1]);
