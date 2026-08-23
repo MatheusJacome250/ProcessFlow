@@ -79,6 +79,22 @@ void executar_tarefa(Tarefa *tarefa) {
     }
 
     argumentos[tarefa->qtd_argumentos + 1] = NULL;
+
+    pid_t pid = fork();
+
+    if (pid < 0) {
+        printf("Erro ao criar processo.\n");
+        return;
+    }
+
+    if (pid == 0) {
+        execvp(tarefa->programa, argumentos);
+
+        perror("Erro ao executar programa");
+        _exit(1);
+
+        waitpid(pid, NULL, 0);
+    }
 }
 
 int main() {
@@ -116,6 +132,23 @@ int main() {
 
         else if (strcmp(lista_comando[0], "task") == 0) {
             cadastrar_tarefa(lista_comando, contador_comando);
+        }
+
+        else if (strcmp(lista_comando[0], "run") == 0) {
+
+            if (contador_comando < 2) {
+                printf("Erro!!! Informe uma tarefa.\n");
+                continue;
+            }
+
+            Tarefa *tarefa = buscar_tarefa(lista_comando[1]);
+
+            if (tarefa == NULL) {
+                printf("Erro!!! Tarefa nao encontrada.\n");
+                continue;
+            }
+
+            executar_tarefa(tarefa);
         }
     }
 
