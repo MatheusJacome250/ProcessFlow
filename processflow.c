@@ -147,6 +147,82 @@ void executar_paralelo(char *lista_comando[], int contador_comando) {
     }
 }
 
+void executar_pipe(char *lista_comando[], int contador_comando) {
+
+    int qtd_tarefas_pipe = contador_comando - 2;
+    int qtd_pipes = qtd_tarefas_pipe - 1;
+
+    int descritores_pipe[MAX_ARGS][2];
+
+    for (int i = 0; i < qtd_pipes; i++) {
+
+        if (pipe(descritores_pipe[i]) == -1) {
+            perror("Erro ao criar pipe");
+            return;
+        }
+    }
+
+    pid_t pids[MAX_ARGS];
+
+    for (int i = 0; i < qtd_tarefas_pipe; i++) {
+
+        Tarefa *tarefa = buscar_tarefa(lista_comando[i + 2]);
+
+        if (tarefa == NULL) {
+            printf("Erro!!! Tarefa %s nao encontrada.\n", lista_comando[i + 2]);
+            return;
+        }
+
+        pid_t pid = fork();
+
+        if (pid < 0) {
+            printf("Erro ao criar processo.\n");
+            return;
+        }
+
+        if (pid == 0) {
+
+            if (i > 0) {
+                dup2(descritores_pipe[i - 1][0], STDIN_FILENO);
+            }
+
+            if (i < qtd_tarefas_pipe - 1) {
+                dup2(descritores_pipe[i][1], STDOUT_FILENO);
+            }
+
+            for (int j = 0; j < qtd_pipes; j++) {
+                close(descritores_pipe[j][0]);
+                close(descritores_pipe[j][1]);
+            }
+
+            char *argumentos[MAX_ARGS + 2];
+
+            argumentos[0] = tarefa->programa;
+
+            for (int j = 0; j < tarefa->qtd_argumentos; j++) {
+                argumentos[j + 1] = tarefa->argumentos[j];
+            }
+
+            argumentos[tarefa->qtd_argumentos + 1] = NULL;
+
+            execvp(tarefa->programa, argumentos);
+
+            perror("Erro ao executar programa");
+            _exit(1);
+        }
+        pids[i] = pid;
+    }
+
+    for (int i = 0; i < qtd_pipes; i++) {
+        close(descritores_pipe[i][0]);
+        close(descritores_pipe[i][1]);
+    }
+
+    for (int i = 0; i < qtd_tarefas_pipe; i++) {
+        waitpid(pids[i], NULL, 0);
+    }
+}
+
 int main() {
 
     char linha[MAX_CHAR];
@@ -209,6 +285,16 @@ int main() {
                 }
 
                 executar_paralelo(lista_comando, contador_comando);
+            }
+
+            else if (strcmp(lista_comando[1], "pipe") == 0) {
+
+                if (contador_comando < 4) {
+                    printf("Erro!!! Informe pelo menos duas tarefas.\n");
+                    continue;
+                }
+
+                executar_pipe(lista_comando, contador_comando);
             }
 
             else {
