@@ -24,6 +24,15 @@ typedef struct Tarefa {
 Tarefa *inicio = NULL;
 Tarefa *fim = NULL;
 
+typedef struct Job {
+    int id;
+    pid_t pid;
+    struct Job *prox;
+} Job;
+
+Job *inicio_job = NULL;
+int proximo_job = 1;
+
 pid_t iniciar_tarefa(Tarefa *tarefa) {
 
     char *argumentos[MAX_ARGS + 2];
@@ -311,6 +320,90 @@ void definir_append(char *lista_comando[], int contador_comando) {
     strcpy(tarefa->arquivo_saida, lista_comando[2]);
     tarefa->adicionar_fim = true;
 }
+void alterar_diretorio(char *lista_comando[], int contador_comando) {
+
+    if (contador_comando != 2) {
+        printf("Erro!!! formato correto: workdir <diretorio>\n");
+        return;
+    }
+
+    if (chdir(lista_comando[1]) == -1) {
+        perror("Erro ao alterar diretorio");
+        return;
+    }
+}
+
+void iniciar_job(char *lista_comando[], int contador_comando) {
+    if (contador_comando != 2) {
+        printf("Erro!!! formato correto: start <tarefa>\n");
+        return;
+    }
+    Tarefa *tarefa = buscar_tarefa(lista_comando[1]);
+    if (tarefa == NULL) {
+        printf("Erro!!! Tarefa nao encontrada.\n");
+        return;
+    }
+    Job *novo_job = (Job *) malloc(sizeof(Job));
+    if (novo_job == NULL) {
+        printf("Erro!!! Falha ao alocar memoria.\n");
+        return;
+    }
+
+    pid_t pid = iniciar_tarefa(tarefa);
+    if (pid < 0) {
+        free(novo_job);
+        return;
+    }
+
+    novo_job->id = proximo_job;
+    novo_job->pid = pid;
+    novo_job->prox = inicio_job;
+    inicio_job = novo_job;
+
+    printf("[%d] %d\n", novo_job->id, novo_job->pid);
+    proximo_job++;
+}
+void listar_job() {
+
+    Job *atual = inicio_job;
+
+    while (atual != NULL) {
+        printf("[%d] %d\n", atual->id, atual->pid);
+        atual = atual->prox;
+    }
+}
+Job *buscar_job(int id) {
+    Job *atual = inicio_job;
+    while (atual != NULL) {
+        if (atual->id == id) {
+            return atual;
+        }
+
+        atual = atual->prox;
+    }
+
+    return NULL;
+}
+void esperar_job(char *lista_comando[], int contador_comando) {
+    if (contador_comando != 2) {
+        printf("Erro!!! formato correto: wait <jobId>\n");
+        return;
+    }
+
+    int id = atoi(lista_comando[1]);
+    if (id <= 0) {
+        printf("Erro!!! Job invalido.\n");
+        return;
+    }
+
+    Job *job = buscar_job(id);
+    if (job == NULL) {
+        printf("Erro!!! Job nao encontrado.\n");
+        return;
+    }
+
+    waitpid(job->pid, NULL, 0);
+}
 int main() {
 
     char linha[MAX_CHAR];
@@ -355,6 +448,18 @@ int main() {
         }
         else if (strcmp(lista_comando[0], "append") == 0) {
             definir_append(lista_comando, contador_comando);
+        }
+        else if (strcmp(lista_comando[0], "workdir") == 0) {
+            alterar_diretorio(lista_comando, contador_comando);
+        }
+        else if (strcmp(lista_comando[0], "start") == 0) {
+            iniciar_job(lista_comando, contador_comando);
+        }
+        else if (strcmp(lista_comando[0], "jobs") == 0) {
+            listar_job();
+        }
+        else if (strcmp(lista_comando[0], "wait") == 0) {
+            esperar_job(lista_comando, contador_comando);
         }
         else if (strcmp(lista_comando[0], "run") == 0) {
 
