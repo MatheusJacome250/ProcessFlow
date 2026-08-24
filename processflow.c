@@ -4,6 +4,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <fcntl.h>
 
 #define MAX_CHAR 1000
 #define MAX_ARGS 50
@@ -15,6 +16,9 @@ typedef struct Tarefa {
     char argumentos[MAX_ARGS][MAX_TEXTO];
     int qtd_argumentos;
     struct Tarefa *prox;
+    char arquivo_entrada[MAX_TEXTO];
+    char arquivo_saida[MAX_TEXTO];
+    bool adicionar_fim;
 } Tarefa;
 
 Tarefa *inicio = NULL;
@@ -39,13 +43,46 @@ pid_t iniciar_tarefa(Tarefa *tarefa) {
         return -1;
     }
 
-    if (pid == 0) {
-        execvp(tarefa->programa, argumentos);
-
-        perror("Erro ao executar programa");
-        _exit(1);
+if (pid == 0) {
+    if (tarefa->arquivo_entrada[0] != '\0') {
+        int arquivo = open(tarefa->arquivo_entrada, O_RDONLY);
+        if (arquivo == -1) {
+            perror("Erro ao abrir arquivo de entrada");
+            _exit(1);
+        }
+        dup2(arquivo, STDIN_FILENO);
+        close(arquivo);
     }
 
+    if (tarefa->arquivo_saida[0] != '\0') {
+        int arquivo;
+        if (tarefa->adicionar_fim) {
+            arquivo = open(
+                tarefa->arquivo_saida,
+                O_WRONLY | O_CREAT | O_APPEND,
+                0644
+            );
+        }
+        else {
+            arquivo = open(
+                tarefa->arquivo_saida,
+                O_WRONLY | O_CREAT | O_TRUNC,
+                0644
+            );
+        }
+        if (arquivo == -1) {
+            perror("Erro ao abrir arquivo de saida");
+            _exit(1);
+        }
+        dup2(arquivo, STDOUT_FILENO);
+        close(arquivo);
+    }
+
+    execvp(tarefa->programa, argumentos);
+
+    perror("Erro ao executar programa");
+    _exit(1);
+}
     return pid;
 }
 
@@ -71,7 +108,9 @@ void cadastrar_tarefa(char *lista_comando[], int contador_comando) {
     for (int i = 3; i < contador_comando; i++) {
         strcpy(nova_tarefa->argumentos[i - 3], lista_comando[i]);
     }
-
+    nova_tarefa->arquivo_entrada[0] = '\0';
+    nova_tarefa->arquivo_saida[0] = '\0';
+    nova_tarefa->adicionar_fim = false;
     nova_tarefa->prox = NULL;
 
     if (inicio == NULL) {
@@ -222,7 +261,56 @@ void executar_pipe(char *lista_comando[], int contador_comando) {
         waitpid(pids[i], NULL, 0);
     }
 }
+void definir_entrada(char *lista_comando[], int contador_comando) {
 
+    if (contador_comando < 3) {
+        printf("Erro!!! formato correto: input <tarefa> <arquivo>\n");
+        return;
+    }
+
+    Tarefa *tarefa = buscar_tarefa(lista_comando[1]);
+
+    if (tarefa == NULL) {
+        printf("Erro!!! Tarefa nao encontrada.\n");
+        return;
+    }
+
+    strcpy(tarefa->arquivo_entrada, lista_comando[2]);
+}
+void definir_saida(char *lista_comando[], int contador_comando) {
+
+    if (contador_comando < 3) {
+        printf("Erro!!! formato correto: output <tarefa> <arquivo>\n");
+        return;
+    }
+
+    Tarefa *tarefa = buscar_tarefa(lista_comando[1]);
+
+    if (tarefa == NULL) {
+        printf("Erro!!! Tarefa nao encontrada.\n");
+        return;
+    }
+
+    strcpy(tarefa->arquivo_saida, lista_comando[2]);
+    tarefa->adicionar_fim = false;
+}
+void definir_append(char *lista_comando[], int contador_comando) {
+
+    if (contador_comando < 3) {
+        printf("Erro!!! formato correto: append <tarefa> <arquivo>\n");
+        return;
+    }
+
+    Tarefa *tarefa = buscar_tarefa(lista_comando[1]);
+
+    if (tarefa == NULL) {
+        printf("Erro!!! Tarefa nao encontrada.\n");
+        return;
+    }
+
+    strcpy(tarefa->arquivo_saida, lista_comando[2]);
+    tarefa->adicionar_fim = true;
+}
 int main() {
 
     char linha[MAX_CHAR];
@@ -259,7 +347,15 @@ int main() {
         else if (strcmp(lista_comando[0], "task") == 0) {
             cadastrar_tarefa(lista_comando, contador_comando);
         }
-
+        else if (strcmp(lista_comando[0], "input") == 0) {
+            definir_entrada(lista_comando, contador_comando);
+        }
+        else if (strcmp(lista_comando[0], "output") == 0) {
+            definir_saida(lista_comando, contador_comando);
+        }
+        else if (strcmp(lista_comando[0], "append") == 0) {
+            definir_append(lista_comando, contador_comando);
+        }
         else if (strcmp(lista_comando[0], "run") == 0) {
 
             if (contador_comando < 2) {
