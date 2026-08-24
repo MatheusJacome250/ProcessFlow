@@ -27,6 +27,7 @@ Tarefa *fim = NULL;
 typedef struct Job {
     int id;
     pid_t pid;
+    bool finalizado;
     struct Job *prox;
 } Job;
 
@@ -34,7 +35,6 @@ Job *inicio_job = NULL;
 int proximo_job = 1;
 
 pid_t iniciar_tarefa(Tarefa *tarefa) {
-
     char *argumentos[MAX_ARGS + 2];
 
     argumentos[0] = tarefa->programa;
@@ -52,51 +52,56 @@ pid_t iniciar_tarefa(Tarefa *tarefa) {
         return -1;
     }
 
-if (pid == 0) {
-    if (tarefa->arquivo_entrada[0] != '\0') {
-        int arquivo = open(tarefa->arquivo_entrada, O_RDONLY);
-        if (arquivo == -1) {
-            perror("Erro ao abrir arquivo de entrada");
-            _exit(1);
+    if (pid == 0) {
+        if (tarefa->arquivo_entrada[0] != '\0') {
+            int arquivo = open(tarefa->arquivo_entrada, O_RDONLY);
+
+            if (arquivo == -1) {
+                perror("Erro ao abrir arquivo de entrada");
+                _exit(1);
+            }
+
+            dup2(arquivo, STDIN_FILENO);
+            close(arquivo);
         }
-        dup2(arquivo, STDIN_FILENO);
-        close(arquivo);
+
+        if (tarefa->arquivo_saida[0] != '\0') {
+            int arquivo;
+
+            if (tarefa->adicionar_fim) {
+                arquivo = open(
+                    tarefa->arquivo_saida,
+                    O_WRONLY | O_CREAT | O_APPEND,
+                    0644
+                );
+            }
+            else {
+                arquivo = open(
+                    tarefa->arquivo_saida,
+                    O_WRONLY | O_CREAT | O_TRUNC,
+                    0644
+                );
+            }
+
+            if (arquivo == -1) {
+                perror("Erro ao abrir arquivo de saida");
+                _exit(1);
+            }
+
+            dup2(arquivo, STDOUT_FILENO);
+            close(arquivo);
+        }
+
+        execvp(tarefa->programa, argumentos);
+
+        perror("Erro ao executar programa");
+        _exit(1);
     }
 
-    if (tarefa->arquivo_saida[0] != '\0') {
-        int arquivo;
-        if (tarefa->adicionar_fim) {
-            arquivo = open(
-                tarefa->arquivo_saida,
-                O_WRONLY | O_CREAT | O_APPEND,
-                0644
-            );
-        }
-        else {
-            arquivo = open(
-                tarefa->arquivo_saida,
-                O_WRONLY | O_CREAT | O_TRUNC,
-                0644
-            );
-        }
-        if (arquivo == -1) {
-            perror("Erro ao abrir arquivo de saida");
-            _exit(1);
-        }
-        dup2(arquivo, STDOUT_FILENO);
-        close(arquivo);
-    }
-
-    execvp(tarefa->programa, argumentos);
-
-    perror("Erro ao executar programa");
-    _exit(1);
-}
     return pid;
 }
 
 void cadastrar_tarefa(char *lista_comando[], int contador_comando) {
-
     if (contador_comando < 3) {
         printf("Erro!!! \n formato correto: task <nome> <programa> [argumentos...]\n");
         return;
@@ -117,6 +122,7 @@ void cadastrar_tarefa(char *lista_comando[], int contador_comando) {
     for (int i = 3; i < contador_comando; i++) {
         strcpy(nova_tarefa->argumentos[i - 3], lista_comando[i]);
     }
+
     nova_tarefa->arquivo_entrada[0] = '\0';
     nova_tarefa->arquivo_saida[0] = '\0';
     nova_tarefa->adicionar_fim = false;
@@ -133,12 +139,13 @@ void cadastrar_tarefa(char *lista_comando[], int contador_comando) {
 }
 
 Tarefa *buscar_tarefa(char *nome) {
-    
     Tarefa *atual = inicio;
+
     while (atual != NULL) {
         if (strcmp(atual->nome, nome) == 0) {
             return atual;
         }
+
         atual = atual->prox;
     }
 
@@ -146,16 +153,24 @@ Tarefa *buscar_tarefa(char *nome) {
 }
 
 void executar_tarefa(Tarefa *tarefa) {
-
     pid_t pid = iniciar_tarefa(tarefa);
 
     if (pid > 0) {
-        waitpid(pid, NULL, 0);
+        int status;
+
+        if (waitpid(pid, &status, 0) > 0) {
+            if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
+                printf(
+                    "Processo %d terminou com codigo %d.\n",
+                    pid,
+                    WEXITSTATUS(status)
+                );
+            }
+        }
     }
 }
 
 void executar_sequencial(char *lista_comando[], int contador_comando) {
-
     for (int i = 2; i < contador_comando; i++) {
         Tarefa *tarefa = buscar_tarefa(lista_comando[i]);
 
@@ -169,12 +184,10 @@ void executar_sequencial(char *lista_comando[], int contador_comando) {
 }
 
 void executar_paralelo(char *lista_comando[], int contador_comando) {
-
     pid_t pids[MAX_ARGS];
     int qtd_pids = 0;
 
     for (int i = 2; i < contador_comando; i++) {
-
         Tarefa *tarefa = buscar_tarefa(lista_comando[i]);
 
         if (tarefa == NULL) {
@@ -191,19 +204,38 @@ void executar_paralelo(char *lista_comando[], int contador_comando) {
     }
 
     for (int i = 0; i < qtd_pids; i++) {
-        waitpid(pids[i], NULL, 0);
+        int status;
+
+        if (waitpid(pids[i], &status, 0) > 0) {
+            if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
+                printf(
+                    "Processo %d terminou com codigo %d.\n",
+                    pids[i],
+                    WEXITSTATUS(status)
+                );
+            }
+        }
     }
 }
 
 void executar_pipe(char *lista_comando[], int contador_comando) {
-
     int qtd_tarefas_pipe = contador_comando - 2;
     int qtd_pipes = qtd_tarefas_pipe - 1;
+
+    Tarefa *tarefas_pipe[MAX_ARGS];
+
+    for (int i = 0; i < qtd_tarefas_pipe; i++) {
+        tarefas_pipe[i] = buscar_tarefa(lista_comando[i + 2]);
+
+        if (tarefas_pipe[i] == NULL) {
+            printf("Erro!!! Tarefa %s nao encontrada.\n", lista_comando[i + 2]);
+            return;
+        }
+    }
 
     int descritores_pipe[MAX_ARGS][2];
 
     for (int i = 0; i < qtd_pipes; i++) {
-
         if (pipe(descritores_pipe[i]) == -1) {
             perror("Erro ao criar pipe");
             return;
@@ -213,13 +245,7 @@ void executar_pipe(char *lista_comando[], int contador_comando) {
     pid_t pids[MAX_ARGS];
 
     for (int i = 0; i < qtd_tarefas_pipe; i++) {
-
-        Tarefa *tarefa = buscar_tarefa(lista_comando[i + 2]);
-
-        if (tarefa == NULL) {
-            printf("Erro!!! Tarefa %s nao encontrada.\n", lista_comando[i + 2]);
-            return;
-        }
+        Tarefa *tarefa = tarefas_pipe[i];
 
         pid_t pid = fork();
 
@@ -229,13 +255,18 @@ void executar_pipe(char *lista_comando[], int contador_comando) {
         }
 
         if (pid == 0) {
-
             if (i > 0) {
-                dup2(descritores_pipe[i - 1][0], STDIN_FILENO);
+                dup2(
+                    descritores_pipe[i - 1][0],
+                    STDIN_FILENO
+                );
             }
 
             if (i < qtd_tarefas_pipe - 1) {
-                dup2(descritores_pipe[i][1], STDOUT_FILENO);
+                dup2(
+                    descritores_pipe[i][1],
+                    STDOUT_FILENO
+                );
             }
 
             for (int j = 0; j < qtd_pipes; j++) {
@@ -258,6 +289,7 @@ void executar_pipe(char *lista_comando[], int contador_comando) {
             perror("Erro ao executar programa");
             _exit(1);
         }
+
         pids[i] = pid;
     }
 
@@ -267,12 +299,22 @@ void executar_pipe(char *lista_comando[], int contador_comando) {
     }
 
     for (int i = 0; i < qtd_tarefas_pipe; i++) {
-        waitpid(pids[i], NULL, 0);
+        int status;
+
+        if (waitpid(pids[i], &status, 0) > 0) {
+            if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
+                printf(
+                    "Processo %d terminou com codigo %d.\n",
+                    pids[i],
+                    WEXITSTATUS(status)
+                );
+            }
+        }
     }
 }
-void definir_entrada(char *lista_comando[], int contador_comando) {
 
-    if (contador_comando < 3) {
+void definir_entrada(char *lista_comando[], int contador_comando) {
+    if (contador_comando != 3) {
         printf("Erro!!! formato correto: input <tarefa> <arquivo>\n");
         return;
     }
@@ -286,9 +328,9 @@ void definir_entrada(char *lista_comando[], int contador_comando) {
 
     strcpy(tarefa->arquivo_entrada, lista_comando[2]);
 }
-void definir_saida(char *lista_comando[], int contador_comando) {
 
-    if (contador_comando < 3) {
+void definir_saida(char *lista_comando[], int contador_comando) {
+    if (contador_comando != 3) {
         printf("Erro!!! formato correto: output <tarefa> <arquivo>\n");
         return;
     }
@@ -303,9 +345,9 @@ void definir_saida(char *lista_comando[], int contador_comando) {
     strcpy(tarefa->arquivo_saida, lista_comando[2]);
     tarefa->adicionar_fim = false;
 }
-void definir_append(char *lista_comando[], int contador_comando) {
 
-    if (contador_comando < 3) {
+void definir_append(char *lista_comando[], int contador_comando) {
+    if (contador_comando != 3) {
         printf("Erro!!! formato correto: append <tarefa> <arquivo>\n");
         return;
     }
@@ -320,8 +362,8 @@ void definir_append(char *lista_comando[], int contador_comando) {
     strcpy(tarefa->arquivo_saida, lista_comando[2]);
     tarefa->adicionar_fim = true;
 }
-void alterar_diretorio(char *lista_comando[], int contador_comando) {
 
+void alterar_diretorio(char *lista_comando[], int contador_comando) {
     if (contador_comando != 2) {
         printf("Erro!!! formato correto: workdir <diretorio>\n");
         return;
@@ -338,18 +380,23 @@ void iniciar_job(char *lista_comando[], int contador_comando) {
         printf("Erro!!! formato correto: start <tarefa>\n");
         return;
     }
+
     Tarefa *tarefa = buscar_tarefa(lista_comando[1]);
+
     if (tarefa == NULL) {
         printf("Erro!!! Tarefa nao encontrada.\n");
         return;
     }
+
     Job *novo_job = (Job *) malloc(sizeof(Job));
+
     if (novo_job == NULL) {
         printf("Erro!!! Falha ao alocar memoria.\n");
         return;
     }
 
     pid_t pid = iniciar_tarefa(tarefa);
+
     if (pid < 0) {
         free(novo_job);
         return;
@@ -357,23 +404,19 @@ void iniciar_job(char *lista_comando[], int contador_comando) {
 
     novo_job->id = proximo_job;
     novo_job->pid = pid;
+    novo_job->finalizado = false;
     novo_job->prox = inicio_job;
+
     inicio_job = novo_job;
 
     printf("[%d] %d\n", novo_job->id, novo_job->pid);
+
     proximo_job++;
 }
-void listar_job() {
 
-    Job *atual = inicio_job;
-
-    while (atual != NULL) {
-        printf("[%d] %d\n", atual->id, atual->pid);
-        atual = atual->prox;
-    }
-}
 Job *buscar_job(int id) {
     Job *atual = inicio_job;
+
     while (atual != NULL) {
         if (atual->id == id) {
             return atual;
@@ -384,6 +427,73 @@ Job *buscar_job(int id) {
 
     return NULL;
 }
+
+void remover_job(int id) {
+    Job *atual = inicio_job;
+    Job *anterior = NULL;
+
+    while (atual != NULL) {
+        if (atual->id == id) {
+            if (anterior == NULL) {
+                inicio_job = atual->prox;
+            }
+            else {
+                anterior->prox = atual->prox;
+            }
+
+            free(atual);
+            return;
+        }
+
+        anterior = atual;
+        atual = atual->prox;
+    }
+}
+
+void coletar_jobs_finalizados() {
+    Job *atual = inicio_job;
+
+    while (atual != NULL) {
+        if (!atual->finalizado) {
+            int status;
+
+            pid_t resultado = waitpid(
+                atual->pid,
+                &status,
+                WNOHANG
+            );
+
+            if (resultado > 0) {
+                atual->finalizado = true;
+
+                if (
+                    WIFEXITED(status) &&
+                    WEXITSTATUS(status) != 0
+                ) {
+                    printf(
+                        "Processo %d terminou com codigo %d.\n",
+                        atual->pid,
+                        WEXITSTATUS(status)
+                    );
+                }
+            }
+        }
+
+        atual = atual->prox;
+    }
+}
+
+void listar_job() {
+    coletar_jobs_finalizados();
+
+    Job *atual = inicio_job;
+
+    while (atual != NULL) {
+        printf("[%d] %d\n", atual->id, atual->pid);
+        atual = atual->prox;
+    }
+}
+
 void esperar_job(char *lista_comando[], int contador_comando) {
     if (contador_comando != 2) {
         printf("Erro!!! formato correto: wait <jobId>\n");
@@ -391,29 +501,72 @@ void esperar_job(char *lista_comando[], int contador_comando) {
     }
 
     int id = atoi(lista_comando[1]);
+
     if (id <= 0) {
         printf("Erro!!! Job invalido.\n");
         return;
     }
 
     Job *job = buscar_job(id);
+
     if (job == NULL) {
         printf("Erro!!! Job nao encontrado.\n");
         return;
     }
 
-    waitpid(job->pid, NULL, 0);
+    if (!job->finalizado) {
+        int status;
+
+        if (waitpid(job->pid, &status, 0) > 0) {
+            if (
+                WIFEXITED(status) &&
+                WEXITSTATUS(status) != 0
+            ) {
+                printf(
+                    "Processo %d terminou com codigo %d.\n",
+                    job->pid,
+                    WEXITSTATUS(status)
+                );
+            }
+        }
+    }
+
+    remover_job(id);
 }
-int main() {
+
+int main(int argc, char *argv[]) {
+    if (argc > 2) {
+        printf("Erro!!! Numero incorreto de argumentos.\n");
+        return 1;
+    }
+
+    FILE *entrada = stdin;
+
+    if (argc == 2) {
+        entrada = fopen(argv[1], "r");
+
+        if (entrada == NULL) {
+            printf("Erro!!! Nao foi possivel abrir o arquivo workflow.\n");
+            return 1;
+        }
+    }
 
     char linha[MAX_CHAR];
 
     while (true) {
+        coletar_jobs_finalizados();
 
-        printf("processflow> ");
+        if (argc == 1) {
+            printf("processflow> ");
+            fflush(stdout);
+        }
 
-        if (fgets(linha, sizeof(linha), stdin) == NULL) {
+        if (fgets(linha, sizeof(linha), entrada) == NULL) {
             break;
+        }
+
+        if (argc == 2) {
+            printf("%s", linha);
         }
 
         linha[strcspn(linha, "\n")] = '\0';
@@ -434,9 +587,13 @@ int main() {
         }
 
         if (strcmp(lista_comando[0], "exit") == 0) {
+            if (contador_comando != 1) {
+                printf("Erro!!! formato correto: exit\n");
+                continue;
+            }
+
             break;
         }
-
         else if (strcmp(lista_comando[0], "task") == 0) {
             cadastrar_tarefa(lista_comando, contador_comando);
         }
@@ -456,20 +613,23 @@ int main() {
             iniciar_job(lista_comando, contador_comando);
         }
         else if (strcmp(lista_comando[0], "jobs") == 0) {
+            if (contador_comando != 1) {
+                printf("Erro!!! formato correto: jobs\n");
+                continue;
+            }
+
             listar_job();
         }
         else if (strcmp(lista_comando[0], "wait") == 0) {
             esperar_job(lista_comando, contador_comando);
         }
         else if (strcmp(lista_comando[0], "run") == 0) {
-
             if (contador_comando < 2) {
                 printf("Erro!!! Informe uma tarefa.\n");
                 continue;
             }
 
             if (strcmp(lista_comando[1], "sequential") == 0) {
-
                 if (contador_comando < 3) {
                     printf("Erro!!! Informe pelo menos uma tarefa.\n");
                     continue;
@@ -477,9 +637,7 @@ int main() {
 
                 executar_sequencial(lista_comando, contador_comando);
             }
-
             else if (strcmp(lista_comando[1], "parallel") == 0) {
-
                 if (contador_comando < 3) {
                     printf("Erro!!! Informe pelo menos uma tarefa.\n");
                     continue;
@@ -487,9 +645,7 @@ int main() {
 
                 executar_paralelo(lista_comando, contador_comando);
             }
-
             else if (strcmp(lista_comando[1], "pipe") == 0) {
-
                 if (contador_comando < 4) {
                     printf("Erro!!! Informe pelo menos duas tarefas.\n");
                     continue;
@@ -497,8 +653,11 @@ int main() {
 
                 executar_pipe(lista_comando, contador_comando);
             }
-
             else {
+                if (contador_comando != 2) {
+                    printf("Erro!!! formato correto: run <tarefa>\n");
+                    continue;
+                }
 
                 Tarefa *tarefa = buscar_tarefa(lista_comando[1]);
 
@@ -510,6 +669,13 @@ int main() {
                 executar_tarefa(tarefa);
             }
         }
+        else {
+            printf("Erro!!! Comando desconhecido.\n");
+        }
+    }
+
+    if (argc == 2) {
+        fclose(entrada);
     }
 
     return 0;
