@@ -23,3 +23,28 @@ Compatibility check successful (0)
 [?2004lmake: *** No rule to make target 'processflow.c', needed by 'processflow'.  Stop.
 [?2004h]0;mathe@Mjcome: /mnt/d/3pSO[01;32mmathe@Mjcome[00m:[01;34m/mnt/d/3pSO[00m$ 
 Script done on 2026-08-24 21:13:16-03:00 [COMMAND_EXIT_CODE="0"]
+Script started on 2026-08-24 21:13:18-03:00 [TERM="xterm-256color" TTY="/dev/pts/9" COLUMNS="123" LINES="11"]
+[?2004h]0;mathe@Mjcome: /mnt/d/3pSO/masj[01;32mmathe@Mjcome[00m:[01;34m/mnt/d/3pSO/masj[00m$ make clean[4Pcode .[3Ppwdcode .make clean[K[K./processflow
+[?2004lprocessflow> ^[[A^[[A^[[A^[[B^[[B                    ^[[A    task teste echo Ola_ProcessFlow oi                oi
+processflow> run teste
+oi
+processflow> exit
+[?2004h]0;mathe@Mjcome: /mnt/d/3pSO/masj[01;32mmathe@Mjcome[00m:[01;34m/mnt/d/3pSO/masj[00m$ [7m./processflow[27m./processflow
+[?2004lprocessflow> task espera sleep 2
+processflow> task mensagem echo MENSAGEM
+processflow> run sequential espera mensagem
+MENSAGEM
+processflow> run parallel espera mensagem
+MENSAGEM
+processflow> exit
+[?2004h]0;mathe@Mjcome: /mnt/d/3pSO/masj[01;32mmathe@Mjcome[00m:[01;34m/mnt/d/3pSO/masj[00m$ [7m./processflow[27m./processflow
+[?2004lprocessflow> task gerar printf c\nb\na\n
+processflow> task ordenar sort
+processflow> task contar wc -l
+processflow> run pipe gerar ordenar contar
+3
+processflow> exit
+[?2004h]0;mathe@Mjcome: /mnt/d/3pSO/masj[01;32mmathe@Mjcome[00m:[01;34m/mnt/d/3pSO/masj[00m$ exit
+[?2004lexit
+
+Script done on 2026-08-24 21:22:38-03:00 [COMMAND_EXIT_CODE="0"]
