@@ -48,3 +48,78 @@ processflow> exit
 [?2004lexit
 
 Script done on 2026-08-24 21:22:38-03:00 [COMMAND_EXIT_CODE="0"]
+Script started on 2026-08-24 22:20:32-03:00 [TERM="xterm-256color" TTY="/dev/pts/0" COLUMNS="118" LINES="11"]
+[?2004h]0;mathe@Mjcome: /mnt/d/3pSO/masj[01;32mmathe@Mjcome[00m:[01;34m/mnt/d/3pSO/masj[00m$ [7mprintf "c\nb\na\n" > nomes.txt[27m
+[7m./processflow[27m[A]0;mathe@Mjcome: /mnt/d/3pSO/masj[01;32mmathe@Mjcome[00m:[01;34m/mnt/d/3pSO/masj[00m$ printf "c\nb\na\n" > nomes.txt
+./processflow
+[?2004lprocessflow> task ordenar sort
+input ordenar processflow> nomes.txt
+run orprocessflow> denar
+a
+b
+c
+processflow> output ordenar resultado.txt
+runprocessflow>  ordenar
+task mostrar cat resultado.txt
+run mostrarprocessflow> processflow> 
+a
+b
+c
+processflow> append ordenar resultado.txt
+runprocessflow>  ordenar
+run mostrarprocessflow> 
+a
+b
+c
+a
+b
+c
+processflow> task onde pwd
+workdir /tmp
+run oprocessflow> processflow> nde
+/tmp
+processflow> task espera sleep 5
+start esperaprocessflow> 
+[1] 542
+processflow> jobs
+[1] 542
+processflow> wait 1
+jobsprocessflow> 
+processflow> wait 1
+jobsErro!!! Job nao encontrado.
+processflow> 
+processflow> wait 1
+jobsErro!!! Job nao encontrado.
+processflow> wait 1
+jobsErro!!! Comando desconhecido.
+processflow> jobs
+Erro!!! Comando desconhecido.
+processflow> exit
+[?2004h]0;mathe@Mjcome: /mnt/d/3pSO/masj[01;32mmathe@Mjcome[00m:[01;34m/mnt/d/3pSO/masj[00m$ [7mprintf "task teste echo Ola_Workflow\nrun teste\nexit\n" > teste.pf[27m
+[7m./processflow teste.pf[27m[A]0;mathe@Mjcome: /mnt/d/3pSO/masj[01;32mmathe@Mjcome[00m:[01;34m/mnt/d/3pSO/masj[00m$ printf "task teste echo Ola_Workflow\nrun teste\nexit\n" > teste.pf
+./processflow teste.pf
+[?2004ltask teste echo Ola_Workflow
+run teste
+Ola_Workflow
+exit
+[?2004h]0;mathe@Mjcome: /mnt/d/3pSO/masj[01;32mmathe@Mjcome[00m:[01;34m/mnt/d/3pSO/masj[00m$ [7m./processflow[27m./processflow
+[?2004lprocessflow> run inexistente
+Erro!!! Tarefa nao encontrada.
+processflow> task ruim programa_que_nao_existe
+run ruimprocessflow> 
+Erro ao executar programa: No such file or directory
+Processo 546 terminou com codigo 1.
+processflow> task ruim programa_que_nao_existe
+run ruimprocessflow> 
+Erro ao executar programa: No such file or directory
+Processo 547 terminou com codigo 1.
+processflow> wait 999
+Erro!!! Job nao encontrado.
+processflow> workdir /diretorio/que/nao/existe
+Erro ao alterar diretorio: No such file or directory
+processflow> ./processflow arquivo1.pf arquivo2.pf
+Erro!!! Comando desconhecido.
+processflow> run inexistente
+Erro!!! Tarefa nao encontrada.
+processflow> 
+Script done on 2026-08-24 22:23:41-03:00 [COMMAND_EXIT_CODE="0"]
